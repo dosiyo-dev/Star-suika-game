@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>별 합치기 게임</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:#05060f;color:#eef;font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+  #app{position:relative;height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;align-items:center;padding:6px 8px 6px}
+  #hud{width:100%;display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:2px 4px 6px}
+  #hud b{font-size:20px;color:#ffd84a}
+  #next{display:flex;align-items:center;gap:6px}
+  #nextC{width:36px;height:36px}
+  #ctrl{width:100%;display:flex;gap:8px;padding:8px 0 0}
+  .sm{flex:1;font-size:14px;padding:8px 10px;border-radius:18px;background:#2a2f55;color:#eef}
+  .sm.armed{background:#ff4a3a;color:#fff}
+  .sm:disabled{opacity:.35}
+  body.timer canvas{border-color:#ff4a3a}
+  body.timer #remain{color:#ffe000}
+  #clock{width:100%;display:flex;justify-content:space-between;font-size:13px;padding:0 4px 6px;font-variant-numeric:tabular-nums}
+  #clock b{font-size:17px}
+  #clock .warn{color:#ff4a3a!important}
+  #wrap{position:relative;flex:1;min-height:0;width:100%;display:flex;justify-content:center;align-items:center;gap:8px}
+  #board{position:relative;display:flex}
+  canvas{border:2px solid #334;border-radius:10px;background:linear-gradient(#0a0d24,#05060f);touch-action:none}
+  #spec{position:relative;flex:0 0 auto;width:80px;height:100%;line-height:1.2;color:#dfe4ff}
+  #spec .lab{position:absolute;left:0;right:0;height:14px;line-height:14px;font-size:10px;color:#8892c8;padding-left:1px}
+  #spec .lab.top{top:0}
+  #spec .lab.bot{bottom:0}
+  #spec .bar{position:absolute;left:5px;top:14px;bottom:14px;width:8px;border-radius:4px}
+  #spec .rows{position:absolute;left:0;right:0;top:14px;bottom:14px;display:flex;flex-direction:column}
+  .srow{position:relative;flex:1;min-height:0;display:flex;align-items:center;opacity:.5}
+  .srow.on{opacity:1}
+  .srow .dot{position:absolute;left:0;top:0;width:18px;height:100%;display:flex;align-items:center;justify-content:center}
+  .srow .dot i{display:block;width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,255,255,.6)}
+  .srow .stx{margin-left:21px;display:flex;flex-direction:column;min-width:0;white-space:nowrap;overflow:hidden}
+  .srow .stx b{font-size:var(--f1,11px)}
+  .srow .stx span{font-size:var(--f2,10px);color:#cdd3f0}
+  #toast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.95);width:88%;max-width:340px;background:rgba(10,12,35,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);border:2px solid #fff;border-radius:14px;padding:12px 14px;opacity:0;pointer-events:none;transition:.25s;z-index:5}
+  #toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  #toast h3{margin:0 0 4px;font-size:18px}
+  #toast p{margin:2px 0;font-size:13px;line-height:1.45}
+  #over{position:absolute;inset:0;background:rgba(0,0,10,.82);display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:9;text-align:center;padding:20px}
+  #over.show{display:flex}
+  #over h2{margin:0;font-size:28px}
+  button{font:inherit;font-size:18px;padding:10px 28px;border:0;border-radius:24px;background:#ffd84a;color:#222;font-weight:700}
+  #help{position:absolute;inset:0;background:rgba(0,0,10,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:10;text-align:center;padding:24px;line-height:1.6}
+  #help h2{margin:0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div>점수 <b id="score">0</b></div>
+    <div>최고 <b id="best">0</b></div>
+    <div id="next">다음 <canvas id="nextC" width="72" height="72"></canvas></div>
+  </div>
+  <div id="clock"><div>플레이 시간 <b id="elapsed">0:00</b></div><div>남은 시간 <b id="remain">10:00</b></div></div>
+  <div id="wrap"><div id="board"><canvas id="c" width="360" height="540"></canvas><div id="toast"></div></div><div id="spec"></div></div>
+  <div id="ctrl"><button class="sm" id="modeBtn">10분 모드 시작</button><button class="sm" id="resetBtn">초기화</button></div>
+  <div id="over"><h2>게임 종료</h2><div id="overInfo"></div><button id="again">다시 하기</button><button id="backBtn" class="sm" style="flex:none;display:none;padding:10px 24px">일반 모드로 돌아가기</button></div>
+  <div id="help">
+    <h2>★ 별 합치기 ★</h2>
+    <div>화면을 좌우로 움직여 위치를 정하고<br>손을 떼면 별이 떨어져요.<br><b>같은 별 두 개</b>가 닿으면<br><b>표면 온도가 더 높은 별</b>로 합쳐집니다!<br>붉은 별 → 노란 별 → 흰 별 → 푸른 별<br>빨간 선을 넘기면 게임 끝!<br><small>아래 버튼으로 10분 타이머 모드를 켜고 끌 수 있어요.<br>타이머 모드 중에도 일반 게임은 저장돼요.</small></div>
+    <button id="start">시작</button>
+  </div>
+</div>
+
+<script>
+// ===== 별 데이터 (표면 온도가 낮은 순서) =====
+const STARS = [
+  {n:'베텔게우스', t:3500,  col:'빨간색',     c:'#ff2a1a', r:18, d:'오리온자리의 붉은 초거성. 표면이 비교적 차가워서 붉게 보여요.'},
+  {n:'아크투루스', t:4300,  col:'주황색',     c:'#ff8a00', r:24, d:'목동자리의 가장 밝은 별. 늙은 주황색 거성이에요.'},
+  {n:'태양',       t:5800,  col:'노란색',     c:'#ffe000', r:30, d:'우리의 별! 표면 온도 약 5,800K의 노란색 별이에요.'},
+  {n:'프로키온',   t:6500,  col:'노란빛 흰색', c:'#fff070', r:37, d:'작은개자리의 별. 태양보다 조금 뜨거워 연한 노랑~흰색이에요.'},
+  {n:'베가',       t:9600,  col:'흰색',       c:'#f2f5ff', r:44, d:'거문고자리의 직녀성. 여름철 대삼각형의 별이에요.'},
+  {n:'시리우스',   t:9900,  col:'푸른빛 흰색', c:'#a8c8ff', r:52, d:'밤하늘에서 가장 밝게 보이는 별(큰개자리).'},
+  {n:'리겔',       t:12100, col:'푸른빛 흰색', c:'#7aa8ff', r:60, d:'오리온자리의 청백색 초거성. 태양보다 수만 배 밝아요.'},
+  {n:'스피카',     t:22400, col:'푸른색',     c:'#4f85ff', r:68, d:'처녀자리의 가장 밝은 별. 뜨거운 푸른색 별이에요.'},
+  {n:'나오스',     t:40000, col:'짙은 푸른색', c:'#2a4cff', r:86, d:'고물자리의 별. 표면 온도 약 4만K로, 가장 뜨거운 별 중 하나예요.'}
+];
+const TOP = STARS.length-1;
+const W=360, H=540, LINE=100, G=1000;
+let LIMIT=600;            // 제한 시간(초): 10분
+let startT=0, mode='normal', saved=null, playSec=0, lastReal=0;
+function fmt(t){t=Math.max(0,Math.floor(t));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')}
+function updateClock(){
+  $('elapsed').textContent=fmt(playSec);
+  const e=$('remain');
+  if(mode==='timer'){const r=LIMIT-playSec;e.textContent=fmt(Math.ceil(r));e.classList.toggle('warn',r<=60);}
+  else{e.textContent='--:--';e.classList.remove('warn');}
+}
+
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let balls=[], rings=[], score=0, best=0, discovered=new Set([0]), unlocked=new Set([0]);
+let aimX=W/2, nextLv=0, curLv=0, cooldown=0, dragging=false, running=false, over=false, idc=0;
+try{ best=+localStorage.getItem('starBest')||0 }catch(e){}
+$('best').textContent=best;
+
+// 표면 온도에 따른 색 스펙트럼 (오른쪽 여백): 위로 갈수록 뜨거운 별
+const EX=[['베텔게우스','안타레스'],['아크투루스','알데바란'],['태양','카펠라'],['프로키온','카노푸스'],['베가','데네브'],['시리우스','카스토르'],['리겔','레굴루스'],['스피카','벨라트릭스'],['나오스','알니탁']];
+const spec=$('spec');
+(function(){
+  const N=STARS.length;
+  const stops=[...STARS].reverse().map((s,k)=>s.c+' '+((k+.5)/N*100).toFixed(1)+'%').join(',');
+  let h='<div class="lab top">뜨거움</div><div class="bar" style="background:linear-gradient(to bottom,'+stops+')"></div><div class="rows">';
+  for(let i=N-1;i>=0;i--){const s=STARS[i];
+    h+='<div class="srow" id="chip'+i+'"><span class="dot"><i style="background:'+s.c+';box-shadow:0 0 8px '+s.c+'"></i></span>'
+      +'<span class="stx"><b>'+s.t.toLocaleString()+'K</b><span>'+EX[i][0]+'</span><span>'+EX[i][1]+'</span></span></div>';}
+  h+='</div><div class="lab bot">차가움</div>';
+  spec.innerHTML=h;
+  spec.querySelectorAll('.srow').forEach(r=>{const i=+r.id.slice(4);r.onclick=()=>showToast(i);});
+})();
+function markChips(){ STARS.forEach((s,i)=>$('chip'+i).classList.toggle('on',discovered.has(i))); }
+
+let toastTimer;
+function showToast(i){
+  const s=STARS[i], t=$('toast');
+  t.style.borderColor=s.c;
+  t.innerHTML=`<h3 style="color:${s.c}">${i+1}단계 · ${s.n}</h3>
+   <p>표면 온도: <b>약 ${s.t.toLocaleString()} K</b></p>
+   <p>색깔: <b>${s.col}</b></p><p>${s.d}</p>`;
+  t.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3800);
+}
+
+function randLv(){            // 이미 합성해서 만들어 본 별만 떨어짐 (베텔게우스는 처음부터)
+  const w=[.4,.3,.2,.1]; let tot=0;
+  for(let i=0;i<w.length;i++) if(unlocked.has(i)) tot+=w[i];
+  let r=Math.random()*tot;
+  for(let i=0;i<w.length;i++){ if(!unlocked.has(i)) continue; if(r<w[i]) return i; r-=w[i]; }
+  return 0;
+}
+function setNext(){ curLv=nextLv; nextLv=randLv(); showNext(); }
+function showNext(){
+  const g=$('nextC').getContext('2d'), nr=2*(7+3*nextLv), sp=SPR[nextLv];
+  g.clearRect(0,0,72,72); g.drawImage(sp,36-nr,36-nr,2*nr,2*nr);
+}
+
+function freshGame(){            // 별·점수·발견 기록·시계까지 모두 새로 시작
+  balls=[];rings=[];score=0;discovered=new Set([0]);unlocked=new Set([0]);over=false;cooldown=0;window._danger=false;
+  playSec=0;startT=performance.now();lastReal=startT;
+  $('score').textContent=0;$('over').classList.remove('show');markChips();
+  nextLv=randLv();setNext();updateClock();
+}
+function resetProgress(){        // 화면에 쌓은 별과 점수만 초기화
+  balls=[];rings=[];score=0;over=false;cooldown=0;window._danger=false;
+  $('score').textContent=0;$('over').classList.remove('show');
+  nextLv=randLv();setNext();
+}
+function flash(html,c,ms){
+  const t=$('toast');t.style.borderColor=c||'#fff';t.innerHTML=html;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms||3200);
+}
+function syncUI(){
+  $('modeBtn').textContent=mode==='timer'?'일반 모드로 돌아가기':'10분 모드 시작';
+  $('resetBtn').textContent='초기화';
+  $('resetBtn').disabled=mode==='timer';
+  $('again').textContent=mode==='timer'?'10분 다시 시작':'다시 하기';
+  $('backBtn').style.display=mode==='timer'?'inline-block':'none';
+  document.body.classList.toggle('timer',mode==='timer');
+  updateClock();
+}
+function startTimerMode(){
+  saved={balls,score,discovered,unlocked,curLv,nextLv,playSec};
+  mode='timer';freshGame();syncUI();
+  flash('<h3>10분 타이머 모드</h3><p>일반 모드의 게임은 저장되어 있어요.<br>시간이 끝나면 다시 불러올 수 있어요.</p>','#ff4a3a');
+}
+function exitTimerMode(){
+  if(!saved)return;
+  mode='normal';
+  balls=saved.balls;score=saved.score;discovered=saved.discovered;unlocked=saved.unlocked;playSec=saved.playSec;
+  curLv=saved.curLv;nextLv=saved.nextLv;saved=null;
+  rings=[];over=false;cooldown=0;window._danger=false;lastReal=performance.now();
+  $('score').textContent=score;$('over').classList.remove('show');
+  markChips();showNext();syncUI();
+  flash('<h3>일반 모드</h3><p>저장해 둔 게임을 불러왔어요.</p>','#ffe000');
+}
+function armed(btn,label,fn){    // 한 번 더 눌러야 실행되는 확인 버튼
+  if(btn._t){clearTimeout(btn._t);btn._t=0;btn.classList.remove('armed');syncUI();fn();return;}
+  btn.textContent=label;btn.classList.add('armed');
+  btn._t=setTimeout(()=>{btn._t=0;btn.classList.remove('armed');syncUI();},3000);
+}
+
+function drop(){
+  if(!running||over||cooldown>0) return;
+  const s=STARS[curLv];
+  const x=Math.max(s.r,Math.min(W-s.r,aimX));
+  balls.push({id:idc++,x,y:50,vx:0,vy:0,lv:curLv,r:s.r,age:0,out:0});
+  cooldown=0.55; setNext();
+}
+
+function pos(e){
+  const rc=cv.getBoundingClientRect();
+  return (e.clientX-rc.left)*(W/rc.width);
+}
+cv.addEventListener('pointerdown',e=>{dragging=true;aimX=pos(e);cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(dragging||e.pointerType==='mouse')aimX=pos(e)});
+cv.addEventListener('pointerup',e=>{if(dragging){aimX=pos(e);dragging=false;drop()}});
+
+function addScore(n){
+  score+=n; $('score').textContent=score;
+  if(score>best){best=score;$('best').textContent=best;try{localStorage.setItem('starBest',best)}catch(e){}}
+}
+
+function step(h){
+  for(const b of balls){
+    if(b.gal){b.t+=h;const k=Math.min(b.t/.45,1);b.r=GR0+(GR1-GR0)*(1-(1-k)*(1-k));}
+    b.age+=h; b.vy+=G*h; b.x+=b.vx*h; b.y+=b.vy*h;
+    b.vx*=0.9995; b.vy*=0.9995;
+    if(b.x-b.r<0){b.x=b.r;b.vx=Math.abs(b.vx)*0.2}
+    if(b.x+b.r>W){b.x=W-b.r;b.vx=-Math.abs(b.vx)*0.2}
+    if(b.y+b.r>H){b.y=H-b.r;b.vy=-Math.abs(b.vy)*0.1;b.vx*=0.97}
+  }
+  const merges=[];
+  for(let it=0;it<3;it++){
+    for(let i=0;i<balls.length;i++)for(let j=i+1;j<balls.length;j++){
+      const a=balls[i],b=balls[j];
+      const dx=b.x-a.x,dy=b.y-a.y,rr=a.r+b.r,d2=dx*dx+dy*dy;
+      if(d2>=rr*rr) continue;
+      const d=Math.sqrt(d2)||0.001;
+      if(a.lv===b.lv && it===0 && !a.gal){ merges.push([a,b]); continue; }
+      const nx=dx/d,ny=dy/d,ov=rr-d,ma=a.r*a.r,mb=b.r*b.r,tot=ma+mb;
+      a.x-=nx*ov*mb/tot; a.y-=ny*ov*mb/tot;
+      b.x+=nx*ov*ma/tot; b.y+=ny*ov*ma/tot;
+      const rv=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
+      if(rv>0){
+        const e=0.1;
+        a.vx-=(1+e)*rv*(mb/tot)*nx; a.vy-=(1+e)*rv*(mb/tot)*ny;
+        b.vx+=(1+e)*rv*(ma/tot)*nx; b.vy+=(1+e)*rv*(ma/tot)*ny;
+      }
+    }
+  }
+  // 합치기
+  const used=new Set(), add=[], rem=new Set();
+  for(const [a,b] of merges){
+    if(used.has(a.id)||used.has(b.id)) continue;
+    used.add(a.id);used.add(b.id);rem.add(a.id);rem.add(b.id);
+    const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
+    if(a.lv===TOP){
+      add.push({id:idc++,x,y,vx:(a.vx+b.vx)/2,vy:(a.vy+b.vy)/2,lv:GAL,gal:true,t:0,r:GR0,age:2,out:0});
+      rings.push({x,y,r:STARS[TOP].r,t:0,c:'#fff',big:true});
+    }else{
+      const lv=a.lv+1,s=STARS[lv];
+      add.push({id:idc++,x,y,vx:(a.vx+b.vx)/2,vy:(a.vy+b.vy)/2-40,lv,r:s.r,age:1,out:0});
+      addScore((lv+1)*(lv+1)*2);
+      rings.push({x,y,r:s.r,t:0,c:s.c});
+      unlocked.add(lv);
+      const isNew=!discovered.has(lv);
+      if(isNew){discovered.add(lv);markChips();if(lv!==TOP)showToast(lv);}
+      if(lv===TOP)celebrate(x,y,isNew);
+    }
+  }
+  if(rem.size){ balls=balls.filter(b=>!rem.has(b.id)).concat(add); }
+  const pops=balls.filter(b=>b.gal&&b.t>=GAL_LIFE);
+  if(pops.length){ balls=balls.filter(b=>!pops.includes(b)); pops.forEach(popGalaxy); }
+}
+
+function checkOver(dt){
+  let danger=false;
+  for(const b of balls){
+    if(b.age>0.9 && !b.gal && b.y-b.r<LINE){b.out+=dt;danger=true;if(b.out>2.5){endGame();return}}
+    else b.out=0;
+  }
+  window._danger=danger;
+}
+function endGame(timeUp){
+  over=true;
+  updateClock();
+  $('over').querySelector('h2').textContent=timeUp?'시간 종료!':'게임 종료';
+  const top=Math.max(...discovered);
+  $('overInfo').innerHTML=`점수 <b>${score}</b><br>플레이 시간: ${fmt(playSec)}<br>만난 별: ${discovered.size} / ${STARS.length}종<br>가장 뜨거운 별: <b>${STARS[top].n}</b> (${STARS[top].t.toLocaleString()}K)`+(mode==='timer'?'<br><small>일반 모드 게임은 저장되어 있어요.</small>':'');
+  $('over').classList.add('show');
+}
+
+function hex(c){const n=parseInt(c.slice(1),16);return [n>>16,(n>>8)&255,n&255]}
+function mix(c,t){const [r,g,b]=hex(c),k=t>=0?255:0,a=Math.abs(t);return [r+(k-r)*a|0,g+(k-g)*a|0,b+(k-b)*a|0]}
+function rgba(a,al){return 'rgba('+a[0]+','+a[1]+','+a[2]+','+al+')'}
+function rng(seed){let x=seed;return()=>(x=(x*16807)%2147483647)/2147483647}
+
+// 별 표면 질감(대류 알갱이·얼룩)을 미리 그려 둔 스프라이트
+const SPR=STARS.map((s,lv)=>{
+  const R=Math.ceil(s.r*3), cv2=document.createElement('canvas');
+  cv2.width=cv2.height=R*2;
+  const g=cv2.getContext('2d'), rnd=rng(lv*977+13);
+  g.beginPath();g.arc(R,R,R,0,7);g.clip();
+  const bs=g.createRadialGradient(R*.85,R*.8,R*.05,R,R,R);
+  bs.addColorStop(0,rgba(mix(s.c,.12),1));
+  bs.addColorStop(.65,rgba(mix(s.c,0),1));
+  bs.addColorStop(1,rgba(mix(s.c,-.2),1));
+  g.fillStyle=bs;g.fillRect(0,0,2*R,2*R);
+  const hi=mix(s.c,.25), lo=mix(s.c,-.32);
+  function blob(x,y,rad,col,al){
+    const gr=g.createRadialGradient(x,y,0,x,y,rad);
+    gr.addColorStop(0,rgba(col,al));gr.addColorStop(1,rgba(col,0));
+    g.fillStyle=gr;g.beginPath();g.arc(x,y,rad,0,7);g.fill();
+  }
+  function rp(m){const a=rnd()*6.283,d=Math.sqrt(rnd())*R*m;return [R+Math.cos(a)*d,R+Math.sin(a)*d]}
+  for(let i=0;i<14;i++){const [x,y]=rp(.9);blob(x,y,R*(.22+rnd()*.25),rnd()<.5?hi:lo,.2)}      // 큰 얼룩
+  for(let i=0;i<R*1.6;i++){const [x,y]=rp(1);blob(x,y,R*(.04+rnd()*.1),rnd()<.5?hi:lo,.38)}    // 알갱이
+  for(let i=0;i<3;i++){const [x,y]=rp(.7);blob(x,y,R*(.08+rnd()*.07),lo,.45)}                  // 어두운 점
+  const lim=g.createRadialGradient(R,R,R*.6,R,R,R);
+  lim.addColorStop(0,'rgba(0,0,0,0)');lim.addColorStop(1,'rgba(0,0,0,.2)');
+  g.fillStyle=lim;g.fillRect(0,0,2*R,2*R);
+  return cv2;
+});
+STARS.forEach((s,i)=>{const el=document.querySelector('#chip'+i+' i');
+  if(el){el.style.background='url('+SPR[i].toDataURL()+') center/cover';}});
+
+function drawStar(x,y,r,lv,alpha,ang){
+  const s=STARS[lv];
+  ctx.save(); ctx.globalAlpha=alpha||1;
+  ctx.shadowColor=s.c; ctx.shadowBlur=r*0.32;
+  ctx.translate(x,y); ctx.rotate(ang||0);
+  ctx.drawImage(SPR[lv],-r,-r,2*r,2*r);
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha=alpha||1;     // 표면 온도
+  const tt=s.t.toLocaleString()+'K', fs=Math.min(r*.55,r*1.7/3.1,24);
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+  ctx.font='bold '+fs+'px sans-serif';
+  ctx.strokeStyle='rgba(0,0,0,.7)';ctx.lineWidth=Math.max(2,fs*.22);ctx.fillStyle='#fff';
+  ctx.strokeText(tt,x,y);ctx.fillText(tt,x,y);
+  ctx.restore();
+}
+
+
+// 별 주위의 은은한 코로나 (별 몸체보다 먼저 그려서, 맞닿은 별이 겹쳐 보이지 않음)
+function drawCorona(x,y,r,lv,alpha,ph){
+  const c=STARS[lv].c, t=performance.now()/1000, lite=mix(c,.4);
+  ctx.save(); ctx.globalAlpha=alpha||1; ctx.globalCompositeOperation='lighter';
+  const pul=.5+.5*Math.sin(t*2.2+ph);
+  const g=ctx.createRadialGradient(x,y,r*.9,x,y,r*1.2);
+  g.addColorStop(0,rgba(lite,.32+.12*pul));g.addColorStop(1,rgba(lite,0));
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*1.2,0,7);ctx.fill();
+  const N=12;
+  for(let k=0;k<N;k++){
+    const a=k*6.2832/N+ph+t*.12, f=.5+.5*Math.sin(t*3+k*1.9+ph), w=.1;
+    const tip=r*(1.04+.13*f), rb=r*.88;
+    ctx.fillStyle=rgba(lite,.16+.3*f);
+    ctx.beginPath();
+    ctx.moveTo(x+Math.cos(a-w)*rb,y+Math.sin(a-w)*rb);
+    ctx.lineTo(x+Math.cos(a)*tip,y+Math.sin(a)*tip);
+    ctx.lineTo(x+Math.cos(a+w)*rb,y+Math.sin(a+w)*rb);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ===== 나오스 승리 효과 · 은하 폭발 =====
+const GAL=STARS.length, GR0=STARS[TOP].r, GR1=Math.round(STARS[TOP].r*1.3), GAL_LIFE=1.6;
+let fx=[], flashA=0;
+const FXC=['#ffffff','#ffe000','#8fb4ff','#ff9a3c','#2a4cff','#ff2a1a','#7fffd4'];
+
+// 우리 은하(막대 나선은하) 스프라이트
+const GAL_SPR=(()=>{
+  const R=240,c=document.createElement('canvas');c.width=c.height=R*2;
+  const g=c.getContext('2d'),rnd=rng(4242);
+  g.translate(R,R);
+  g.save();g.beginPath();g.arc(0,0,R,0,7);g.clip();
+  let bg=g.createRadialGradient(0,0,0,0,0,R);
+  bg.addColorStop(0,'#2b2459');bg.addColorStop(.45,'#111b52');bg.addColorStop(1,'#04061c');
+  g.fillStyle=bg;g.fillRect(-R,-R,2*R,2*R);
+  const arms=[{o:0,n:1500,k:1},{o:Math.PI,n:1500,k:1},{o:Math.PI/2,n:650,k:.6},{o:-Math.PI/2,n:650,k:.6}];
+  function pt(A,u,spread){
+    const th=u*3.4, rad=R*.08*Math.exp(.74*th), ang=A.o+th;
+    const s=R*spread*(.5+u);
+    return [Math.cos(ang)*rad+(rnd()+rnd()-1)*s, Math.sin(ang)*rad+(rnd()+rnd()-1)*s];
+  }
+  // 나선팔의 푸른 빛 번짐
+  for(const A of arms){for(let i=0;i<46;i++){
+    const u=i/46,[x,y]=pt(A,u,.012),rd=R*(.07+.1*u)*A.k+8;
+    const gr=g.createRadialGradient(x,y,0,x,y,rd);
+    gr.addColorStop(0,'rgba(120,160,255,'+(.16*A.k)+')');gr.addColorStop(1,'rgba(120,160,255,0)');
+    g.fillStyle=gr;g.beginPath();g.arc(x,y,rd,0,7);g.fill();
+  }}
+  // 먼지 띠
+  for(const A of arms){for(let i=0;i<70;i++){
+    const u=.12+.85*(i/70),th=u*3.4-.16,rad=R*.08*Math.exp(.74*th),ang=A.o+th;
+    const x=Math.cos(ang)*rad,y=Math.sin(ang)*rad,rd=R*.045*(.6+u);
+    g.fillStyle='rgba(4,5,20,'+(.3*A.k)+')';g.beginPath();g.arc(x,y,rd,0,7);g.fill();
+  }}
+  // 별들
+  g.globalCompositeOperation='lighter';
+  for(const A of arms){for(let i=0;i<A.n;i++){
+    const u=Math.pow(rnd(),.85),[x,y]=pt(A,u,.05);
+    const q=rnd(),col=u<.3?'#ffe9b0':q<.07?'#ff9ad0':q<.55?'#dfe9ff':'#8fb4ff';
+    g.globalAlpha=.35+rnd()*.6;g.fillStyle=col;g.beginPath();g.arc(x,y,.6+rnd()*(1.4+u*1.2),0,7);g.fill();
+  }}
+  for(let i=0;i<900;i++){  // 원반에 흩어진 별
+    const a=rnd()*6.283,d=Math.sqrt(rnd())*R*.96;
+    g.globalAlpha=.15+rnd()*.35;g.fillStyle='#cfe0ff';g.fillRect(Math.cos(a)*d,Math.sin(a)*d,1.2,1.2);
+  }
+  g.globalAlpha=1;
+  // 중심 막대와 중심부
+  g.save();g.rotate(.5);g.scale(1,.3);
+  let bar=g.createRadialGradient(0,0,0,0,0,R*.4);
+  bar.addColorStop(0,'rgba(255,236,170,.95)');bar.addColorStop(.5,'rgba(255,200,110,.5)');bar.addColorStop(1,'rgba(255,190,100,0)');
+  g.fillStyle=bar;g.beginPath();g.arc(0,0,R*.4,0,7);g.fill();g.restore();
+  let core=g.createRadialGradient(0,0,0,0,0,R*.2);
+  core.addColorStop(0,'rgba(255,252,225,1)');core.addColorStop(.5,'rgba(255,225,150,.6)');core.addColorStop(1,'rgba(255,200,120,0)');
+  g.fillStyle=core;g.beginPath();g.arc(0,0,R*.2,0,7);g.fill();
+  g.globalCompositeOperation='source-over';
+  g.restore();
+  // 가장자리 빛
+  let rim=g.createRadialGradient(0,0,R*.82,0,0,R);
+  rim.addColorStop(0,'rgba(140,170,255,0)');rim.addColorStop(1,'rgba(150,180,255,.45)');
+  g.fillStyle=rim;g.beginPath();g.arc(0,0,R,0,7);g.fill();
+  g.strokeStyle='rgba(185,210,255,.75)';g.lineWidth=5;g.beginPath();g.arc(0,0,R-2.5,0,7);g.stroke();
+  return c;
+})();
+
+function drawGalaxy(b){
+  const ramp=Math.max(0,(b.t-(GAL_LIFE-.4))/.4);          // 터지기 직전 떨림
+  ctx.save();
+  ctx.translate(b.x+ramp*3*Math.sin(b.t*90),b.y);
+  ctx.rotate(b.t*1.2);
+  const sc=1+ramp*.07;
+  ctx.shadowColor='rgba(140,170,255,.9)';ctx.shadowBlur=26;
+  ctx.drawImage(GAL_SPR,-b.r*sc,-b.r*sc,2*b.r*sc,2*b.r*sc);
+  ctx.restore();
+}
+
+function burst(x,y,n,rad){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.283,sp=140+Math.random()*420,d=Math.random()*rad*.5;
+    fx.push({x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:260,t:0,
+      life:.8+Math.random()*.7,c:FXC[i%FXC.length],s:2+Math.random()*3});
+  }
+}
+function popGalaxy(b){
+  addScore(500);
+  rings.push({x:b.x,y:b.y,r:b.r,t:0,c:'#ffffff',big:true},
+             {x:b.x,y:b.y,r:b.r*.6,t:0,c:'#ffe000',big:true},
+             {x:b.x,y:b.y,r:b.r*.3,t:0,c:'#8fb4ff',big:true});
+  burst(b.x,b.y,120,b.r);
+  flashA=.55;
+}
+function celebrate(x,y,first){
+  flashA=.35;
+  burst(x,y,70,STARS[TOP].r);
+  [[W*.2,H*.28],[W*.8,H*.25],[W*.5,H*.16]].forEach((p,i)=>setTimeout(()=>burst(p[0],p[1],45,20),250+i*300));
+  for(let i=0;i<150;i++){
+    fx.push({conf:1,x:Math.random()*W,y:-Math.random()*320,vx:(Math.random()-.5)*100,vy:90+Math.random()*130,g:40,
+      t:0,life:5,c:FXC[i%FXC.length],rot:Math.random()*6.28,vr:(Math.random()-.5)*10,s:5+Math.random()*4});
+  }
+  const s=STARS[TOP];
+  if(first) flash('<div style="text-align:center"><h3 style="font-size:26px;color:#ffe000;margin:0 0 6px">★ 게임 승리! ★</h3>'
+   +'<p style="font-size:16px;color:#fff"><b>'+s.n+'</b> 완성!</p>'
+   +'<p>표면 온도 약 '+s.t.toLocaleString()+'K · '+s.col+'</p><p>'+s.d+'</p></div>','#ffe000',4800);
+}
+function drawFx(){
+  for(const p of fx){
+    ctx.save();ctx.globalAlpha=Math.max(0,1-p.t/p.life);ctx.fillStyle=p.c;
+    if(p.conf){ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.fillRect(-p.s/2,-p.s,p.s,p.s*1.8);}
+    else{ctx.shadowColor=p.c;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,7);ctx.fill();}
+    ctx.restore();
+  }
+  if(flashA>0){ctx.fillStyle='rgba(255,255,255,'+flashA+')';ctx.fillRect(0,0,W,H);}
+}
+
+// 배경 별
+const bg=Array.from({length:50},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()*1.5+.3}));
+
+let SCALE=1;                    // 화면 해상도에 맞춘 그리기 배율
+function draw(){
+  ctx.setTransform(SCALE,0,0,SCALE,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,255,255,.5)';
+  for(const s of bg){ctx.fillRect(s.x,s.y,s.s,s.s)}
+  // 위험선
+  ctx.save();
+  ctx.strokeStyle=window._danger?'#ff3b3b':'rgba(255,80,80,.45)';
+  ctx.lineWidth=2;ctx.setLineDash([8,6]);
+  ctx.beginPath();ctx.moveTo(0,LINE);ctx.lineTo(W,LINE);ctx.stroke();ctx.restore();
+  for(const b of balls) if(!b.gal) drawCorona(b.x,b.y,b.r,b.lv,1,b.id*1.7);
+  for(const b of balls) b.gal?drawGalaxy(b):drawStar(b.x,b.y,b.r,b.lv,1,b.id*1.7);
+  // 조준
+  if(running&&!over){
+    const s=STARS[curLv],x=Math.max(s.r,Math.min(W-s.r,aimX));
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,.25)';ctx.setLineDash([4,6]);
+    ctx.beginPath();ctx.moveTo(x,50+s.r);ctx.lineTo(x,H);ctx.stroke();ctx.restore();
+    drawCorona(x,50,s.r,curLv,cooldown>0?.35:1,0);
+    drawStar(x,50,s.r,curLv,cooldown>0?.35:1);
+  }
+  // 효과 링
+  for(const r of rings){
+    ctx.save();ctx.globalAlpha=1-r.t;ctx.strokeStyle=r.c;ctx.lineWidth=r.big?8:4;
+    ctx.beginPath();ctx.arc(r.x,r.y,r.r*(1+r.t*.8),0,7);ctx.stroke();ctx.restore();
+  }
+  drawFx();
+}
+
+let last=0;
+function loop(ts){
+  const dt=Math.min((ts-last)/1000||0.016,1/30); last=ts;
+  const now=performance.now(), real=Math.min((now-lastReal)/1000,1); lastReal=now;
+  if(running&&!over){
+    cooldown=Math.max(0,cooldown-dt);
+    const n=4;for(let i=0;i<n;i++)step(dt/n);
+    checkOver(dt);
+    if(!over){
+      if(mode==='timer'){playSec=(now-startT)/1000;if(playSec>=LIMIT){playSec=LIMIT;endGame(true);}}
+      else playSec+=real;
+      if(!over)updateClock();
+    }
+  }
+  for(const r of rings)r.t+=dt*2.2;
+  rings=rings.filter(r=>r.t<1);
+  for(const p of fx){p.t+=dt;p.vy+=p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.conf)p.rot+=p.vr*dt;}
+  fx=fx.filter(p=>p.t<p.life);
+  flashA=Math.max(0,flashA-dt*1.8);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+$('start').onclick=()=>{$('help').style.display='none';running=true;mode='normal';freshGame();syncUI();};
+$('again').onclick=()=>{ if(mode==='timer'){freshGame();syncUI();} else resetProgress(); };
+$('backBtn').onclick=exitTimerMode;
+$('modeBtn').onclick=()=>{ if(mode==='normal')startTimerMode(); else armed($('modeBtn'),'한 번 더 누르면 종료',exitTimerMode); };
+$('resetBtn').onclick=()=>armed($('resetBtn'),'한 번 더 누르면 초기화',()=>{unlocked=new Set([0]);resetProgress();flash('<h3>초기화 완료</h3><p>쌓인 별, 점수, 떨어지는 별 종류를 초기화했어요.</p>','#ffe000');});
+function fitCanvas(){          // 게임판과 오른쪽 스펙트럼을 화면에 맞춰 배치
+  const w=$('wrap'),W0=w.clientWidth,H0=w.clientHeight; if(!W0||!H0)return;
+  const sw=Math.round(Math.max(76,Math.min(100,W0*.2))),gap=8;
+  const sc=Math.min((W0-sw-gap)/W,H0/H);
+  const cw=Math.max(60,Math.floor(W*sc)),ch=Math.max(90,Math.floor(H*sc));
+  cv.style.width=cw+'px';cv.style.height=ch+'px';
+  const dpr=Math.min(window.devicePixelRatio||1,2),bw=Math.round((cw-4)*dpr);   // 고해상도 화면에서 글씨·별을 또렷하게
+  SCALE=bw/W; cv.width=bw; cv.height=Math.round(H*SCALE);
+  spec.style.width=sw+'px';spec.style.height=ch+'px';
+  const rh=(ch-28)/STARS.length;
+  spec.style.setProperty('--f1',Math.max(8,Math.min(11,rh*.26)).toFixed(1)+'px');
+  spec.style.setProperty('--f2',Math.max(8,Math.min(10.5,rh*.22)).toFixed(1)+'px');
+}
+if(window.ResizeObserver)new ResizeObserver(fitCanvas).observe($('wrap'));
+window.addEventListener('resize',fitCanvas);
+fitCanvas();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
