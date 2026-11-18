@@ -45,8 +45,23 @@
   #over.show{display:flex}
   #over h2{margin:0;font-size:28px}
   button{font:inherit;font-size:18px;padding:10px 28px;border:0;border-radius:24px;background:#ffd84a;color:#222;font-weight:700}
-  #help{position:absolute;inset:0;background:rgba(0,0,10,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:10;text-align:center;padding:24px;line-height:1.6}
-  #help h2{margin:0}
+  #help{position:absolute;inset:0;background:rgba(0,0,10,.88);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:10;text-align:center;padding:24px;line-height:1.6}
+  #help h2{margin:0 0 8px;font-size:clamp(32px,10vw,46px);letter-spacing:2px;color:#f0c800;text-shadow:0 0 12px rgba(255,210,0,.9),0 0 30px rgba(255,120,0,.6),0 3px 0 rgba(0,0,0,.5)}
+  #help .rules{font-size:clamp(17px,5vw,21px);line-height:1.75;word-break:keep-all;text-wrap:balance}
+  #help{overflow-y:auto}
+  #help::before,#help::after{content:"";flex:1 0 0}
+  .hbody{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+  #demoC{flex:0 0 auto;height:clamp(130px,24vh,210px);aspect-ratio:360/540;max-width:100%}
+  #help .rules b{color:#f0c800}
+  #help .rules .k2{color:#4fbfee}
+  #help .rules .k3{color:#f04c3e}
+  @media (min-width:640px){
+    .hbody{flex-direction:row;justify-content:center;gap:24px}
+    #demoC{order:2;height:clamp(150px,40vh,330px)}
+    #help .rules{flex:1;min-width:0;font-size:19px}
+  }
+  @media (max-height:600px){#demoC{height:110px}#help .rules{line-height:1.55}}
+  #help .rules small{display:block;margin-top:8px;font-size:clamp(14px,4vw,16px);color:#b8c0e8;line-height:1.6}
 </style>
 </head>
 <body>
@@ -58,11 +73,11 @@
   </div>
   <div id="clock"><div>플레이 시간 <b id="elapsed">0:00</b></div><div>남은 시간 <b id="remain">10:00</b></div></div>
   <div id="wrap"><div id="board"><canvas id="c" width="360" height="540"></canvas><div id="toast"></div></div><div id="spec"></div></div>
-  <div id="ctrl"><button class="sm" id="modeBtn">10분 모드 시작</button><button class="sm" id="resetBtn">초기화</button></div>
+  <div id="ctrl"><button class="sm" id="modeBtn">10분 모드 시작</button><button class="sm" id="homeBtn">시작 화면으로</button></div>
   <div id="over"><h2>게임 종료</h2><div id="overInfo"></div><button id="again">다시 하기</button><button id="backBtn" class="sm" style="flex:none;display:none;padding:10px 24px">일반 모드로 돌아가기</button></div>
   <div id="help">
     <h2>★ 별 합치기 ★</h2>
-    <div>화면을 좌우로 움직여 위치를 정하고<br>손을 떼면 별이 떨어져요.<br><b>같은 별 두 개</b>가 닿으면<br><b>표면 온도가 더 높은 별</b>로 합쳐집니다!<br>붉은 별 → 노란 별 → 흰 별 → 푸른 별<br>빨간 선을 넘기면 게임 끝!<br><small>아래 버튼으로 10분 타이머 모드를 켜고 끌 수 있어요.<br>타이머 모드 중에도 일반 게임은 저장돼요.</small></div>
+    <div class="hbody"><canvas id="demoC"></canvas><div class="rules">화면을 좌우로 움직여 위치를 정하고<br>손을 떼면 별이 떨어져요.<br><b>같은 별 두 개</b>가 닿으면<br><b class="k2">표면 온도가 더 높은 별</b>로 합쳐집니다!<br><b class="k3">빨간 선을 넘기면 게임 끝!</b><small>아래 버튼으로 10분 타이머 모드를 켜고 끌 수 있어요.<br>타이머 모드 중에도 일반 게임은 저장돼요.</small></div></div>
     <button id="start">시작</button>
   </div>
 </div>
@@ -92,7 +107,8 @@ function updateClock(){
   else{e.textContent='--:--';e.classList.remove('warn');}
 }
 
-const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const cv=document.getElementById('c');
+let ctx=cv.getContext('2d');
 const $=id=>document.getElementById(id);
 let balls=[], rings=[], score=0, best=0, discovered=new Set([0]), unlocked=new Set([0]);
 let aimX=W/2, nextLv=0, curLv=0, cooldown=0, dragging=false, running=false, over=false, idc=0;
@@ -156,8 +172,7 @@ function flash(html,c,ms){
 }
 function syncUI(){
   $('modeBtn').textContent=mode==='timer'?'일반 모드로 돌아가기':'10분 모드 시작';
-  $('resetBtn').textContent='초기화';
-  $('resetBtn').disabled=mode==='timer';
+  $('homeBtn').textContent='시작 화면으로';
   $('again').textContent=mode==='timer'?'10분 다시 시작':'다시 하기';
   $('backBtn').style.display=mode==='timer'?'inline-block':'none';
   document.body.classList.toggle('timer',mode==='timer');
@@ -242,10 +257,12 @@ function step(h){
     if(a.lv===TOP){
       add.push({id:idc++,x,y,vx:(a.vx+b.vx)/2,vy:(a.vy+b.vy)/2,lv:GAL,gal:true,t:0,r:GR0,age:2,out:0});
       rings.push({x,y,r:STARS[TOP].r,t:0,c:'#fff',big:true});
+      sfxGalaxy();
     }else{
       const lv=a.lv+1,s=STARS[lv];
       add.push({id:idc++,x,y,vx:(a.vx+b.vx)/2,vy:(a.vy+b.vy)/2-40,lv,r:s.r,age:1,out:0});
       addScore((lv+1)*(lv+1)*2);
+      sfxMerge(lv);
       rings.push({x,y,r:s.r,t:0,c:s.c});
       unlocked.add(lv);
       const isNew=!discovered.has(lv);
@@ -460,6 +477,175 @@ function drawFx(){
   if(flashA>0){ctx.fillStyle='rgba(255,255,255,'+flashA+')';ctx.fillRect(0,0,W,H);}
 }
 
+// ===== 효과음 (Web Audio로 직접 만든 소리, 외부 파일 없음) =====
+let AC=null, master=null, bgm=null;
+function initAudio(){
+  try{
+    if(!AC){
+      const C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+      AC=new C(); master=AC.createGain(); master.gain.value=.85;
+      const cp=AC.createDynamicsCompressor(); master.connect(cp); cp.connect(AC.destination);
+      bgm=AC.createGain(); bgm.gain.value=.0001; bgm.connect(cp);
+    }
+    if(AC.state!=='running')AC.resume();
+  }catch(e){}
+}
+['pointerdown','pointerup','touchend','click'].forEach(ev=>window.addEventListener(ev,initAudio,{passive:true}));
+function sfxOsc(ac,dest,type,f0,f1,sweep,t,dur,peak,att){
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type=type;o.frequency.setValueAtTime(f0,t);
+  if(f1!==f0)o.frequency.exponentialRampToValueAtTime(f1,t+sweep);
+  g.gain.setValueAtTime(.0001,t);
+  g.gain.exponentialRampToValueAtTime(peak,t+att);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g);g.connect(dest);o.start(t);o.stop(t+dur+.05);
+}
+// 별 합치기: 통통 튀는 '뽁' 소리 (높은 단계일수록 높은 음)
+function sfxMerge(lv,ac,dest){
+  ac=ac||AC;dest=dest||master;
+  if(!ac||(ac===AC&&ac.state!=='running'))return;
+  const t=ac.currentTime,b=300*Math.pow(1.085,lv);
+  sfxOsc(ac,dest,'sine',b*.75,b*1.7,.07,t,.2,.5,.006);
+  sfxOsc(ac,dest,'triangle',b*2.2,b*3.2,.05,t,.12,.14,.004);
+}
+// 은하 탄생: 낮은 울림이 차오르다가 은하가 터지는 순간에 정점
+function sfxGalaxy(ac,dest){
+  ac=ac||AC;dest=dest||master;
+  if(!ac||(ac===AC&&ac.state!=='running'))return;
+  const t=ac.currentTime,L=GAL_LIFE;
+  sfxOsc(ac,dest,'sine',45,110,L,t,L+1.3,.32,L*.95);                      // 저음 스웰
+  const lp=ac.createBiquadFilter();lp.type='lowpass';lp.Q.value=.8;
+  lp.frequency.setValueAtTime(200,t);lp.frequency.exponentialRampToValueAtTime(2400,t+L);lp.connect(dest);
+  [110,165,220,277.2,329.6].forEach(f=>[-7,7].forEach(d=>{                 // 웅장한 화음
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.type='sawtooth';o.frequency.value=f;o.detune.value=d;
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.04,t+L*.95);g.gain.exponentialRampToValueAtTime(.0001,t+L+1.8);
+    o.connect(g);g.connect(lp);o.start(t);o.stop(t+L+1.9);
+  }));
+  [440,554.4,659.3,880,1108.7,1318.5,1760,2217.5].forEach((f,i)=>          // 별빛이 올라가는 소리
+    sfxOsc(ac,dest,i%2?'sine':'triangle',f,f,0,t+.1+i*L*.105,.55,.09,.01));
+  const tb=t+L;                                                            // 터지는 순간
+  sfxOsc(ac,dest,'sine',130,35,.5,tb,1.3,.5,.005);
+  [880,1318.5,1760].forEach(f=>sfxOsc(ac,dest,'sine',f,f,0,tb,1.7,.07,.01));
+  const n=ac.createBuffer(1,Math.floor(ac.sampleRate*1.5),ac.sampleRate),d=n.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const ns=ac.createBufferSource(),nf=ac.createBiquadFilter(),ng=ac.createGain();
+  ns.buffer=n;nf.type='lowpass';nf.frequency.setValueAtTime(5000,tb);nf.frequency.exponentialRampToValueAtTime(200,tb+1.1);
+  ng.gain.setValueAtTime(.0001,tb);ng.gain.exponentialRampToValueAtTime(.28,tb+.01);ng.gain.exponentialRampToValueAtTime(.0001,tb+1.3);
+  ns.connect(nf);nf.connect(ng);ng.connect(dest);ns.start(tb);ns.stop(tb+1.4);
+}
+
+// ===== 시작 화면의 게임 시연 (실제 게임과 같은 별 그림을 사용) =====
+const dcv=$('demoC'), dctx=dcv.getContext('2d'), DLOOP=8.8;
+const easeIO=u=>{u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)};
+function drawDemo(now){
+  if($('help').style.display==='none')return;
+  const cw=dcv.clientWidth; if(!cw)return;
+  const dpr=Math.min(window.devicePixelRatio||1,2), bw=Math.round((cw-4)*dpr);
+  if(dcv.width!==bw){dcv.width=bw;dcv.height=Math.round(H*bw/W);}
+  const k=dcv.width/W, t=(now/1000)%DLOOP, g=1000;
+  const D1=1.9, C1=D1+Math.sqrt(2*(486-50)/g), D2=5.0, C2=D2+Math.sqrt(2*(468-50)/g);
+  const sv=ctx; ctx=dctx;
+  ctx.setTransform(k,0,0,k,0,0); ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='rgba(255,255,255,.5)'; for(const s of bg) ctx.fillRect(s.x,s.y,s.s,s.s);
+  ctx.save();ctx.strokeStyle='rgba(255,80,80,.45)';ctx.lineWidth=2;ctx.setLineDash([8,6]);
+  ctx.beginPath();ctx.moveTo(0,LINE);ctx.lineTo(W,LINE);ctx.stroke();ctx.restore();
+  const fade=t<.4?t/.4:t>8.2?Math.max(0,1-(t-8.2)/.6):1;
+  const items=[], aim=[];
+  const ax1=230+(120-230)*easeIO((t-.4)/1.2), ax2=120+(250-120)*easeIO((t-3.6)/1.2);
+  // 바닥에 있던 별
+  if(t<C1) items.push([120,522,0,1.7,fade]);
+  if(t<C2) items.push([250,516,1,3.4,fade]);
+  // 1) 첫 번째 별: 위치를 정하고 → 떨어뜨려서 → 같은 별과 합쳐짐
+  if(t<D1) {items.push([ax1,50,0,5.1,fade]);aim.push(ax1);}
+  else if(t<C1) items.push([120,50+.5*g*(t-D1)*(t-D1),0,5.1,fade]);
+  else items.push([120,504+12*easeIO((t-C1)/.25),1,6.8,fade]);
+  // 2) 두 번째 별: 합쳐진 별과 같은 단계의 별에 떨어뜨림
+  if(t>=3.3&&t<D2) {items.push([ax2,50,1,8.5,fade*Math.min(1,(t-3.3)/.3)]);aim.push(ax2);}
+  else if(t>=D2&&t<C2) items.push([250,50+.5*g*(t-D2)*(t-D2),1,8.5,fade]);
+  else if(t>=C2) items.push([250,492+18*easeIO((t-C2)/.25),2,10.2,fade]);
+  // 조준선
+  ctx.save();ctx.strokeStyle='rgba(255,255,255,.25)';ctx.setLineDash([4,6]);ctx.lineWidth=2;
+  for(const x of aim){ctx.beginPath();ctx.moveTo(x,70);ctx.lineTo(x,H);ctx.stroke();}ctx.restore();
+  for(const [x,y,lv,ph,a] of items) drawCorona(x,y,STARS[lv].r,lv,a,ph);
+  for(const [x,y,lv,ph,a] of items) drawStar(x,y,STARS[lv].r,lv,a,ph);
+  // 합쳐지는 순간의 빛 고리
+  for(const [tc,x,y,lv] of [[C1,120,504,1],[C2,250,492,2]]){
+    const u=(t-tc)/.55; if(u<0||u>1)continue;
+    ctx.save();ctx.globalAlpha=(1-u)*fade;ctx.strokeStyle=STARS[lv].c;ctx.lineWidth=5;
+    ctx.beginPath();ctx.arc(x,y,STARS[lv].r*(1+u*1.2),0,7);ctx.stroke();ctx.restore();
+  }
+  // 손가락 표시 (누른 채 움직이다가 떼면 별이 떨어짐)
+  for(const [t0,t1,x] of [[.2,D1,ax1],[3.4,D2,ax2]]){
+    if(t<t0||t>t1+.2)continue;
+    const down=t<=t1, a=fade*(down?1:1-(t-t1)/.2);
+    ctx.save();ctx.globalAlpha=a;
+    ctx.fillStyle=down?'rgba(255,255,255,.38)':'rgba(255,255,255,.15)';ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(x,128,down?22:28,0,7);ctx.fill();ctx.stroke();ctx.restore();
+  }
+  ctx=sv;
+}
+// ===== 배경음악 (잔잔한 칩튠 느낌, Web Audio로 직접 연주) =====
+const BGM_STEP=60/92/4, BGM_LEVEL=.5;                              // 92BPM, 16분음표 단위
+const BGM_CH=[{r:48,m:4},{r:45,m:3},{r:41,m:4},{r:43,m:4}];       // 도 - 라 - 파 - 솔 (C - Am - F - G), 2마디씩
+const BGM_MEL=[
+  [[0,76,3],[4,79,3],[8,76,4],[16,74,3],[20,72,3],[24,67,8]],
+  [[0,72,3],[4,76,3],[8,81,4],[16,79,3],[20,76,3],[24,72,8]],
+  [[0,72,3],[4,76,3],[8,79,4],[16,76,3],[20,74,3],[24,69,8]],
+  [[0,74,3],[4,79,3],[8,76,4],[16,74,3],[20,76,3],[24,79,8]]
+];
+const mf=m=>440*Math.pow(2,(m-69)/12);
+function bgmTone(ac,dest,type,m,t,dur,peak,att,rel,lpf){
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type=type;o.frequency.value=mf(m);
+  g.gain.setValueAtTime(.0001,t);
+  g.gain.exponentialRampToValueAtTime(peak,t+att);
+  g.gain.linearRampToValueAtTime(peak*.6,t+Math.max(att+.01,dur-rel));
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  if(lpf){const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=lpf;o.connect(f);f.connect(g);}
+  else o.connect(g);
+  g.connect(dest);o.start(t);o.stop(t+dur+.05);
+}
+function bgmHat(ac,dest,t,v){
+  if(!ac._nb){const n=ac.createBuffer(1,Math.floor(ac.sampleRate*.2),ac.sampleRate),d=n.getChannelData(0);for(let k=0;k<d.length;k++)d[k]=Math.random()*2-1;ac._nb=n;}
+  const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
+  s.buffer=ac._nb;f.type='highpass';f.frequency.value=6500;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.05);
+  s.connect(f);f.connect(g);g.connect(dest);s.start(t);s.stop(t+.06);
+}
+function bgmPlayStep(ac,dest,i,t){
+  const ch=BGM_CH[Math.floor(i/32)%4], s=i%16, sc=i%32, S=BGM_STEP, r=ch.r, T=[r,r+ch.m,r+7,r+12];
+  if(sc===0) [r+12,r+ch.m+12,r+19].forEach(m=>bgmTone(ac,dest,'triangle',m,t,S*32,.022,.6,.8,null));   // 부드러운 화음
+  if(s===0) bgmTone(ac,dest,'triangle',r,t,S*3,.15,.01,.1,null);                                     // 베이스
+  else if(s===6) bgmTone(ac,dest,'triangle',r+12,t,S*2,.08,.01,.08,null);
+  else if(s===8) bgmTone(ac,dest,'triangle',r+7,t,S*3,.13,.01,.1,null);
+  else if(s===14) bgmTone(ac,dest,'triangle',r,t,S*2,.1,.01,.08,null);
+  if(s%2===0) bgmTone(ac,dest,'square',T[[0,1,2,3,2,1,2,1][s/2]]+12,t,S*1.6,.03,.004,.08,2400);       // 통통 튀는 아르페지오
+  for(const n of BGM_MEL[Math.floor(i/32)%4]) if(n[0]===sc) bgmTone(ac,dest,'square',n[1],t,n[2]*S,.05,.012,.1,2600);   // 멜로디
+  if(s===0||s===8) sfxOsc(ac,dest,'sine',120,45,.12,t,.22,.14,.004);                                // 작은 킥
+  if(s%2===0) bgmHat(ac,dest,t,s%4===2?.035:.018);                                                   // 하이햇
+}
+let bgmTimer=null, bgmStep=0, bgmNext=0;
+function bgmTick(){
+  const ac=AC; if(!ac)return;
+  if(bgmNext<ac.currentTime) bgmNext=ac.currentTime+.05;
+  while(bgmNext<ac.currentTime+.4){ bgmPlayStep(ac,bgm,bgmStep,bgmNext); bgmNext+=BGM_STEP; bgmStep=(bgmStep+1)%128; }
+}
+function startMusic(){
+  initAudio(); if(!AC||bgmTimer)return;
+  const t=AC.currentTime;
+  bgm.gain.cancelScheduledValues(t);bgm.gain.setValueAtTime(.0001,t);bgm.gain.exponentialRampToValueAtTime(BGM_LEVEL,t+1);
+  bgmStep=0;bgmNext=t+.1;bgmTick();bgmTimer=setInterval(bgmTick,90);
+}
+function stopMusic(){
+  if(!bgmTimer)return;
+  clearInterval(bgmTimer);bgmTimer=null;
+  const t=AC.currentTime;bgm.gain.cancelScheduledValues(t);bgm.gain.setValueAtTime(Math.max(.0001,bgm.gain.value),t);bgm.gain.exponentialRampToValueAtTime(.0001,t+.5);
+}
+document.addEventListener('visibilitychange',()=>{            // 화면을 벗어나면 멈추고, 돌아오면 이어서
+  if(document.hidden) stopMusic(); else if(running) startMusic();
+});
+
 // 배경 별
 const bg=Array.from({length:50},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()*1.5+.3}));
 
@@ -512,14 +698,20 @@ function loop(ts){
   fx=fx.filter(p=>p.t<p.life);
   flashA=Math.max(0,flashA-dt*1.8);
   draw();
+  drawDemo(performance.now());
   requestAnimationFrame(loop);
 }
 
-$('start').onclick=()=>{$('help').style.display='none';running=true;mode='normal';freshGame();syncUI();};
+$('start').onclick=()=>{initAudio();startMusic();$('help').style.display='none';running=true;mode='normal';freshGame();syncUI();};
 $('again').onclick=()=>{ if(mode==='timer'){freshGame();syncUI();} else resetProgress(); };
 $('backBtn').onclick=exitTimerMode;
 $('modeBtn').onclick=()=>{ if(mode==='normal')startTimerMode(); else armed($('modeBtn'),'한 번 더 누르면 종료',exitTimerMode); };
-$('resetBtn').onclick=()=>armed($('resetBtn'),'한 번 더 누르면 초기화',()=>{unlocked=new Set([0]);resetProgress();flash('<h3>초기화 완료</h3><p>쌓인 별, 점수, 떨어지는 별 종류를 초기화했어요.</p>','#ffe000');});
+$('homeBtn').onclick=()=>armed($('homeBtn'),'한 번 더 누르면 처음으로',()=>{
+  stopMusic();running=false;saved=null;mode='normal';
+  $('over').classList.remove('show');$('toast').classList.remove('show');
+  fx=[];flashA=0;freshGame();syncUI();
+  $('help').style.display='';
+});
 function fitCanvas(){          // 게임판과 오른쪽 스펙트럼을 화면에 맞춰 배치
   const w=$('wrap'),W0=w.clientWidth,H0=w.clientHeight; if(!W0||!H0)return;
   const sw=Math.round(Math.max(76,Math.min(100,W0*.2))),gap=8;
